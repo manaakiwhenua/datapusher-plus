@@ -75,7 +75,7 @@ class DatastoreEncoder(json.JSONEncoder):
 def delete_datastore_resource(resource_id):
     try:
         tk.get_action("datastore_delete")(
-            {"ignore_auth": True}, {"resource_id": resource_id, "force": True}
+            _site_user_context(), {"resource_id": resource_id, "force": True}
         )
     except tk.ObjectNotFound:
         raise utils.JobError("Deleting existing datastore failed.")
@@ -84,7 +84,7 @@ def delete_datastore_resource(resource_id):
 def delete_resource(resource_id):
     try:
         tk.get_action("resource_delete")(
-            {"ignore_auth": True}, {"id": resource_id, "force": True}
+            _site_user_context(), {"id": resource_id, "force": True}
         )
     except tk.ObjectNotFound:
         raise utils.JobError("Deleting existing resource failed.")
@@ -105,6 +105,17 @@ def datastore_resource_exists(resource_id):
         return result
     except tk.ObjectNotFound:
         return False
+
+
+def _site_user_context():
+    """A context that names the site user.
+
+    From CKAN 2.11 the activity plugin requires context["user"] on every
+    action that records an activity (datastore_create and datastore_delete
+    both patch the resource), and raises ValidationError otherwise.
+    """
+    site_user = tk.get_action("get_site_user")({"ignore_auth": True}, {})
+    return {"ignore_auth": True, "user": site_user["name"]}
 
 
 def send_resource_to_datastore(
@@ -140,7 +151,7 @@ def send_resource_to_datastore(
         }
     try:
         resource_dict = tk.get_action("datastore_create")(
-            {"ignore_auth": True}, request
+            _site_user_context(), request
         )
         return resource_dict
     except Exception as e:
